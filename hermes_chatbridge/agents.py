@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-"""Hermes-native worker delegation for the prime chat (ChatGPT web).
+"""Hermes-native worker delegation for the calling Hermes workflow.
 
 CoS spawns worker *browser chats* via extension automation — deliberately not
 ported (no browser scraping). The Hermes-native equivalent: a worker is a
 background ``hermes -z`` one-shot run whose report the prime collects with
 the ``agents`` tool. Workers spend Hermes-side model quota; the prime driving
-them spends ChatGPT chat quota.
+them uses the configured Hermes model/provider quota.
 
 Security notes:
 - Disabled unless ``agents_enabled: true`` in chatbridge.yaml (default OFF).

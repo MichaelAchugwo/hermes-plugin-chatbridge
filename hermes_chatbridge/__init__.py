@@ -1,3 +1,3 @@
-"""ChatBridge — local MCP executor for ChatGPT web chat (CoS-core patterns, Hermes-native)."""
+"""ChatBridge — Hermes-native local MCP workbench (CoS-core patterns)."""
 
-__version__ = "0.1.0"
+__version__ = "0.6.1"

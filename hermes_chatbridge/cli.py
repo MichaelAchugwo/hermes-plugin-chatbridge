@@ -9,7 +9,7 @@ from .mcp_app import build_app
 
 
 def register_cli(parser: argparse.ArgumentParser) -> None:
-    parser.description = "ChatBridge — local MCP executor for ChatGPT web chat"
+    parser.description = "ChatBridge — Hermes-native local MCP workbench"
     subs = parser.add_subparsers(dest="cb_action")
     subs.add_parser("status", help="Show bridge config (no secrets)")
     srv = subs.add_parser("serve", help="Run loopback MCP bridge in foreground")

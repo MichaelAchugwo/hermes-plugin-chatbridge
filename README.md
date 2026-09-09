@@ -1,18 +1,18 @@
 # ChatBridge for Hermes
 
-Local MCP executor that lets **ChatGPT web chat** (your ChatGPT subscription quota) drive approved local work through Hermes — the complement to ARGOS, which governs the Codex API quota pool.
+Hermes-native local MCP workbench for approved local files, patches, commands, durable sessions, images, artifacts, and opt-in worker delegation. It complements ARGOS, which governs the Hermes Codex OAuth credential pool.
 
 Lineage: core executor patterns from [chat-on-steroids](https://github.com/totec448-spec/chat-on-steroids) (approved roots, capability switches, read-only kill switch, bounded results, loopback-only MCP endpoint with per-surface secret paths), reimplemented Hermes-native in Python. No Electron fork, no browser scraping, no extension port.
 
 ## Why a separate plugin (not part of ARGOS)
 
-- Different trust boundary: ARGOS promises OAuth tokens only ever go to the `chatgpt.com` usage endpoint and never scrapes the browser. A local executor for web ChatGPT must never touch ARGOS auth state.
+- Different trust boundary: ARGOS promises OAuth tokens only ever go to the official `chatgpt.com` usage endpoint and never scrapes a browser. ChatBridge must never touch ARGOS auth state.
 - Different lifecycle: a loopback MCP server + tunnel + approved-folder permissions, vs quota governance.
 - Deliberately NOT ported: the Chrome-extension DOM observation/attribution, Compact & Resume browser orchestration, worker-chat browser automation, Desktop computer-control, and tunnel-client bundling. Those would violate the no-scraping non-goal and need a full app, not a Hermes plugin.
 
-## Requirements / plan-tier reality
+## Hermes-first operation
 
-ChatGPT Developer mode + custom MCP apps: full write actions need Business/Enterprise/Edu (Business may need admin); **Plus/Pro web plans are read/fetch-limited**. So v0 is genuinely useful read-only (read approved files, bounded search results later), and write tools stay disabled until your workspace supports them.
+ChatBridge is installed, configured, and run by Hermes. Its MCP endpoint is an optional interoperability surface for a client you explicitly choose; it is not a ChatGPT or Codex desktop-app extension, does not automate a browser, and does not consume web-chat quota.
 
 ## Install
 
@@ -39,9 +39,9 @@ allow_patch: false
 
 Zero approved roots = the bridge answers but every `read` fails closed.
 
-## Exposing it to ChatGPT (tunnel)
+## Optional remote MCP client (tunnel)
 
-The bridge binds 127.0.0.1 only. ChatGPT reaches it through a tunnel you run:
+The bridge binds 127.0.0.1 only. An approved remote MCP client can reach it through a tunnel you run:
 
 ```bash
 hermes chatbridge serve --port 18789
@@ -50,7 +50,7 @@ cloudflared tunnel --url http://127.0.0.1:18789
 
 Take the `https://<name>.trycloudflare.com` URL cloudflared prints, put it in
 `chatbridge.yaml` as `tunnel_host: <name>.trycloudflare.com`, restart
-`serve`, and register this connector URL in ChatGPT (Developer mode → MCP):
+`serve`, and register this connector URL only with the MCP client you intend to authorize:
 
 ```
 https://<name>.trycloudflare.com/<secret-from-~/.hermes/chatbridge.token>/mcp
@@ -87,8 +87,7 @@ worker_model: ""
 
 Honest differences from CoS to know before enabling:
 
-- Workers spend **Hermes-side model quota** (Codex/API); the prime driving
-  them spends ChatGPT chat quota. Each run writes `--usage-file` to
+- Workers spend **Hermes-side model quota** (Codex/API). Each run writes `--usage-file` to
   `$HERMES_HOME/workers/<id>.usage.json` so cost is auditable.
 - Workers are one-shot runs, not persistent chats. `message` on a finished
   worker revives it: a follow-up run seeded with (task, prior report, new
@@ -138,11 +137,11 @@ exec_allowlist: npm test; git status
   parents must exist, existing files never overwritten, signed URL query material never
   logged.
 
-## Connect ChatGPT
+## Optional MCP-client connection
 
 1. `hermes chatbridge serve --port 0` (loopback only; prints the port).
 2. Expose it via your own HTTPS tunnel (Cloudflare quick tunnel or equivalent) — the full public URL including the random tunnel path plus `/<token>/mcp` is the connector URL (the token segment is the credential; treat the URL as a password).
-3. In ChatGPT web: enable Developer mode, create a custom MCP app of Tunnel type pointing at it, review actions, enable.
+3. In the approved MCP client, add the connector URL, review its actions, and enable it.
 4. Start with one read-only task; confirm the exact paths in the reply before widening anything.
 
 ## Safety

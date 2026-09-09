@@ -9,8 +9,8 @@ except ImportError:
 def register(ctx) -> None:
     ctx.register_cli_command(
         name="chatbridge",
-        help="Local MCP bridge for ChatGPT web chat",
+        help="Hermes-native local MCP workbench",
         setup_fn=register_cli,
         handler_fn=command,
-        description="Loopback-local executor (approved roots, read-only default) for ChatGPT Developer-mode MCP.",
+        description="Loopback-local executor (approved roots, read-only default) managed by Hermes.",
     )

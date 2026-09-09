@@ -75,7 +75,7 @@ def build_server(cfg: BridgeConfig | None = None, home: Path | None = None) -> M
             record_event(home, entry)
 
     if cfg.allow_save and not cfg.read_only:
-        @server.tool(description="Save a ChatGPT-generated file (files.oaiusercontent.com only) into an approved folder.")
+        @server.tool(description="Save an allowlisted remote artifact (files.oaiusercontent.com only) into an approved folder.")
         def download_artifact(
             url: Annotated[str, Field(description="HTTPS files.oaiusercontent.com URL")] = "",
             dest: Annotated[str, Field(description="Destination virtual path; parents must exist")] = "",

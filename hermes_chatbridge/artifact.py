@@ -15,7 +15,7 @@ def _reject(reason: str) -> dict:
 
 
 def save_artifact(url: str, dest: str, roots: list[str], *, opener=urlopen) -> dict:
-    """Save a ChatGPT-generated file reference into an approved folder.
+    """Save an allowlisted remote artifact into an approved folder.
 
     Only HTTPS URLs on the OpenAI files host are accepted; signed query
     material is never written to the transcript (callers must redact it).

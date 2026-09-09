@@ -1,9 +1,9 @@
 name: chatbridge
-version: 0.6.0
-description: "Local MCP bridge letting ChatGPT web chat drive approved local files/commands via Hermes — spends ChatGPT chat quota."
+version: 0.6.1
+description: "Hermes-native local MCP workbench for approved files, patches, commands, sessions, and worker delegation."
 author: "Michael Achugwo + Hermes Agent"
 license: MIT
 manifest_version: 1
 api_version: 1
-tags: [chatgpt, mcp, local-executor, desktop]
+tags: [hermes, mcp, local-executor, approved-roots]
 config_schema: {}
