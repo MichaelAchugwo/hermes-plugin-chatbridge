@@ -99,8 +99,9 @@ Honest differences from CoS to know before enabling:
   so workers cannot spawn workers. Worker cwd is locked to the first
   approved root.
 - Default OFF (unlike CoS's on-by-default): enabling runs agent processes as
-  your user. Live `hermes -z` verification is pending a quota reset; mechanics
-  are covered by stub-runner tests (18/18 green).
+  your user. Full MCP path verified live (list → spawn → status →
+  message/revive → finish → transcript, stub runner); only a real model run's
+  stdout is pending a quota reset.
 
 ## Write tools (opt-in)
 
