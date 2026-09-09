@@ -39,6 +39,38 @@ allow_patch: false
 
 Zero approved roots = the bridge answers but every `read` fails closed.
 
+## Exposing it to ChatGPT (tunnel)
+
+The bridge binds 127.0.0.1 only. ChatGPT reaches it through a tunnel you run:
+
+```bash
+hermes chatbridge serve --port 18789
+cloudflared tunnel --url http://127.0.0.1:18789
+```
+
+Take the `https://<name>.trycloudflare.com` URL cloudflared prints, put it in
+`chatbridge.yaml` as `tunnel_host: <name>.trycloudflare.com`, restart
+`serve`, and register this connector URL in ChatGPT (Developer mode → MCP):
+
+```
+https://<name>.trycloudflare.com/<secret-from-~/.hermes/chatbridge.token>/mcp
+```
+
+Verified end to end: health, `initialize`, `tools/list`, `tools/call read`
+all 200 through the public URL; wrong token → 404, other Host → 421,
+non-loopback Origin → 403. Three things the tunnel run taught us (all fixed
+and regression-tested):
+
+- The loopback guard checks the TCP peer, not the Host header (tunnels
+  forward the public hostname as Host).
+- `serve` passes `proxy_headers=False`: uvicorn ≥ 0.41 trusts
+  `X-Forwarded-For` from loopback peers by default, which would let the
+  tunnel's XFF masquerade as the peer.
+- The MCP SDK's DNS-rebinding check stays on; `tunnel_host` allowlists the
+  public hostname explicitly. Quick-tunnel hostnames are random per run —
+  for daily use prefer a named tunnel (stable hostname) and update
+  `tunnel_host` accordingly. Treat the full connector URL as a password.
+
 ## Write tools (opt-in)
 
 Disabled unless **all three** hold in `chatbridge.yaml`: `read_only: false`, the matching

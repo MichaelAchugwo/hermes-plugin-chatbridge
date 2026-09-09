@@ -110,20 +110,18 @@ def write_stdin(session_id: str, chars: str = "", yield_ms: int = DEFAULT_YIELD_
             sess.proc.stdin.flush()
         except (OSError, ValueError, AttributeError):
             pass
-    text, running = "", True
+    collected, running = "", True
     deadline = time.time() + max(100, min(yield_ms, MAX_EXEC_SECONDS * 1000)) / 1000.0
     while time.time() < deadline:
-        if sess.proc.poll() is not None:
-            text, running = sess.take_output()
-            break
-        text, running = sess.take_output()
-        if text:
+        chunk, running = sess.take_output()
+        collected += chunk
+        if not running:
             break
         time.sleep(0.05)
     if not running:
         # Process ended: this collection is final; the session retires.
         with _sessions_lock:
             _sessions.pop(session_id, None)
-        return {"exit_code": sess.proc.returncode, "output": text[-MAX_EXEC_BYTES:],
+        return {"exit_code": sess.proc.returncode, "output": collected[-MAX_EXEC_BYTES:],
                 "running": False, "truncated": sess.truncated}
-    return {"output": text[-MAX_EXEC_BYTES:], "running": running, "truncated": sess.truncated}
+    return {"output": collected[-MAX_EXEC_BYTES:], "running": running, "truncated": sess.truncated}

@@ -59,6 +59,14 @@ def test_write_tools_absent_by_default():
                                        "view_image"]
 
 
+def test_loopback_peer_helper():
+    from hermes_chatbridge.mcp_app import is_loopback_peer
+    for good in ("127.0.0.1", "::1", "::ffff:127.0.0.1", "127.0.0.2"):
+        assert is_loopback_peer(good), good
+    for bad in ("10.0.0.5", "8.8.8.8", "", None, "testclient", "localhost"):
+        assert not is_loopback_peer(bad), bad
+
+
 def test_live_mcp_handshake_and_secret_path(tmp_path):
     import socket
     import uvicorn
@@ -67,7 +75,8 @@ def test_live_mcp_handshake_and_secret_path(tmp_path):
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(build_app(cfg), host="127.0.0.1", port=port, log_level="error"))
+    server = uvicorn.Server(uvicorn.Config(build_app(cfg), host="127.0.0.1", port=port, log_level="error",
+                                           proxy_headers=False))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     deadline = time.time() + 15
@@ -109,6 +118,51 @@ def test_live_mcp_handshake_and_secret_path(tmp_path):
         bad = httpx.post(f"http://127.0.0.1:{port}/wrong/mcp", headers=headers, json={
             "jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": {}}, timeout=10)
         assert bad.status_code == 404
+        # Tunneled Host (tunnel forwards the public hostname) must pass: the
+        # guard checks the TCP peer, not Host. Non-loopback Origin still 403s.
+        tun = httpx.get(f"http://127.0.0.1:{port}/tok123/health",
+                        headers={"Host": "x.trycloudflare.com"}, timeout=10)
+        assert tun.status_code == 200, tun.text[:200]
+        csrf = httpx.get(f"http://127.0.0.1:{port}/tok123/health",
+                         headers={"Origin": "https://evil.example"}, timeout=10)
+        assert csrf.status_code == 403
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+
+
+def test_tunnel_host_allowlisted_for_sdk_rebinding_check(tmp_path):
+    import socket
+    import threading
+    import time
+    import urllib.request
+    import uvicorn
+    cfg = BridgeConfig(approved_roots=[str(tmp_path)], secret_token="toktxn",
+                       tunnel_host="x.trycloudflare.com")
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(build_app(cfg), host="127.0.0.1", port=port, log_level="error",
+                                           proxy_headers=False))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    try:
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/toktxn/health", timeout=2).read()
+                break
+            except OSError:
+                time.sleep(0.1)
+        import httpx
+        headers = {"Accept": "application/json, text/event-stream"}
+        body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        ok = httpx.post(f"http://127.0.0.1:{port}/toktxn/mcp", headers={**headers, "Host": "x.trycloudflare.com"},
+                        json=body, timeout=10)
+        assert ok.status_code == 200, ok.text[:200]
+        other = httpx.post(f"http://127.0.0.1:{port}/toktxn/mcp", headers={**headers, "Host": "evil.example"},
+                           json=body, timeout=10)
+        assert other.status_code == 421, other.status_code
     finally:
         server.should_exit = True
         thread.join(timeout=10)

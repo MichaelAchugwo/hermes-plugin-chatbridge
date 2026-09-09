@@ -22,6 +22,7 @@ class BridgeConfig:
     exec_allowlist: list[str] = field(default_factory=list)
     secret_token: str = ""
     port: int = 0  # 0 = ephemeral
+    tunnel_host: str = ""  # public tunnel hostname (e.g. xxx.trycloudflare.com); empty = loopback only
 
     @classmethod
     def load(cls, home: Path | None = None) -> "BridgeConfig":
@@ -48,6 +49,8 @@ class BridgeConfig:
                     cfg.exec_allowlist = [r.strip() for r in v.split(";") if r.strip()]
                 elif k == "allow_save":
                     cfg.allow_save = v.lower() == "true"
+                elif k == "tunnel_host":
+                    cfg.tunnel_host = v.strip().lower()
         tok_path = base / "chatbridge.token"
         if tok_path.exists():
             cfg.secret_token = tok_path.read_text(encoding="utf-8").strip()

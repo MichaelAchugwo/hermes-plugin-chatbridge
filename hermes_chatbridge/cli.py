@@ -36,7 +36,11 @@ def command(args: argparse.Namespace) -> int:
         import uvicorn
         app = build_app(cfg)
         # Bind loopback only; the secret path segment is the credential.
+        # proxy_headers=False: uvicorn>=0.41 trusts X-Forwarded-For from
+        # loopback peers by default, which would let the tunnel's XFF
+        # (the internet client's IP) masquerade as the TCP peer and break
+        # the loopback guard below. The guard must see the real peer.
         uvicorn.run(app, host="127.0.0.1", port=args.port or cfg.port or 0,
-                    log_level="warning")
+                    log_level="warning", proxy_headers=False)
         return 0
     return 2

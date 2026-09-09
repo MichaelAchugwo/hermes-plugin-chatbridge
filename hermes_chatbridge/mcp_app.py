@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -136,13 +137,33 @@ def build_server(cfg: BridgeConfig | None = None, home: Path | None = None) -> M
     return server
 
 
+def is_loopback_peer(host: object) -> bool:
+    """True iff *host* is a loopback address (v4 127/8 incl. mapped, or ::1)."""
+    import ipaddress
+
+    if not isinstance(host, str) or not host:
+        return False
+    try:
+        return ipaddress.ip_address(host.strip().lower()).is_loopback
+    except ValueError:
+        return False
+
+
 class _Guard(BaseHTTPMiddleware):
-    """Loopback Host + Origin enforcement in front of the MCP app."""
+    """Loopback TCP-peer + Origin enforcement in front of the MCP app.
+
+    The check is on the TCP peer (``request.client``), NOT the Host header:
+    a tunnel (cloudflared etc.) connects from 127.0.0.1 but forwards the
+    public hostname as Host, so a Host allowlist would 403 all tunneled
+    traffic. The socket itself binds 127.0.0.1, so a loopback peer check is
+    equivalent and tunnel-compatible. The Origin check stays as the
+    DNS-rebinding/CSRF defense for browser-issued requests.
+    """
 
     async def dispatch(self, request: Request, call_next):
-        host = (request.headers.get("host") or "").split(":")[0].lower()
-        if host not in {"127.0.0.1", "localhost", "::1"}:
-            return JSONResponse({"error": "host not loopback"}, status_code=403)
+        peer = request.client.host if request.client else ""
+        if not is_loopback_peer(peer):
+            return JSONResponse({"error": "peer not loopback"}, status_code=403)
         origin = request.headers.get("origin")
         if origin:
             from urllib.parse import urlparse
@@ -159,8 +180,14 @@ def build_app(cfg: BridgeConfig | None = None, home: Path | None = None) -> Star
     slash variants), so a wrong token is a plain 404 with no oracle.
     """
     cfg = cfg or BridgeConfig.load()
+    # The MCP SDK's DNS-rebinding check stays ON; when a public tunnel front
+    # is configured, its hostname is allowlisted explicitly. The real
+    # enforcement remains the loopback TCP-peer guard + secret path above.
+    security = (TransportSecuritySettings(allowed_hosts=[cfg.tunnel_host])
+                if cfg.tunnel_host else None)
     app = build_server(cfg, home).streamable_http_app(
         streamable_http_path="/mcp", stateless_http=True, json_response=True,
+        transport_security=security,
     )
     token = cfg.secret_token
 
