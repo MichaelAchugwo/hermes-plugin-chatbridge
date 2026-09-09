@@ -23,6 +23,12 @@ class BridgeConfig:
     secret_token: str = ""
     port: int = 0  # 0 = ephemeral
     tunnel_host: str = ""  # public tunnel hostname (e.g. xxx.trycloudflare.com); empty = loopback only
+    agents_enabled: bool = False  # multi-agent workers (hermes -z runs); default OFF
+    agents_max_workers: int = 2  # concurrency cap, hard max 8
+    worker_provider: str = ""  # empty = configured defaults
+    worker_model: str = ""  # empty = configured defaults
+    worker_argv: list[str] = field(default_factory=list)  # extra argv after the binary (wrappers)
+    hermes_bin: str = "hermes"  # worker runner (tests point at a stub)
 
     @classmethod
     def load(cls, home: Path | None = None) -> "BridgeConfig":
@@ -51,6 +57,21 @@ class BridgeConfig:
                     cfg.allow_save = v.lower() == "true"
                 elif k == "tunnel_host":
                     cfg.tunnel_host = v.strip().lower()
+                elif k == "agents_enabled":
+                    cfg.agents_enabled = v.lower() == "true"
+                elif k == "agents_max_workers":
+                    try:
+                        cfg.agents_max_workers = int(v or 2)
+                    except ValueError:
+                        pass
+                elif k == "worker_provider":
+                    cfg.worker_provider = v.strip()
+                elif k == "worker_model":
+                    cfg.worker_model = v.strip()
+                elif k == "hermes_bin":
+                    cfg.hermes_bin = v.strip() or "hermes"
+                elif k == "worker_argv":
+                    cfg.worker_argv = [a.strip() for a in v.split(";") if a.strip()]
         tok_path = base / "chatbridge.token"
         if tok_path.exists():
             cfg.secret_token = tok_path.read_text(encoding="utf-8").strip()
@@ -67,6 +88,8 @@ class BridgeConfig:
         # Monotonic-discovery safe: read-only tools always listed; write tools
         # listed only when explicitly enabled (fresh endpoint starts without them).
         names = ["read", "view_image", "find", "session"]
+        if self.agents_enabled:
+            names.append("agents")
         if self.allow_save and not self.read_only:
             names.append("download_artifact")
         if self.allow_patch and not self.read_only:

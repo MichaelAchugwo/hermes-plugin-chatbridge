@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import anyio
 import json
+import os
+import sys
 import threading
 import time
 import urllib.request
@@ -166,6 +168,81 @@ def test_tunnel_host_allowlisted_for_sdk_rebinding_check(tmp_path):
     finally:
         server.should_exit = True
         thread.join(timeout=10)
+
+
+def test_agents_disabled_by_default_and_no_nesting(tmp_path):
+    from hermes_chatbridge import agents as _agents
+    assert "agents" not in BridgeConfig().tool_names()
+    cfg = BridgeConfig(approved_roots=[str(tmp_path)])
+    assert _agents.spawn("do things", cfg, tmp_path) == {"error": "TOOL_DISABLED"}
+    os.environ[_agents.WORKER_ENV_MARKER] = "1"
+    try:
+        on = BridgeConfig(approved_roots=[str(tmp_path)], agents_enabled=True)
+        assert _agents.spawn("do things", on, tmp_path) == {"error": "workers cannot spawn workers"}
+    finally:
+        del os.environ[_agents.WORKER_ENV_MARKER]
+
+
+STUB = (
+    "import sys, time\n"
+    "task = sys.argv[sys.argv.index('-z') + 1] if '-z' in sys.argv else ''\n"
+    "assert 'chatbridge.token' not in task and 'trycloudflare' not in task, 'URL leaked to worker'\n"
+    "if 'SLEEP' in task:\n"
+    "    time.sleep(30)\n"
+    "print('REPORT:' + task[:60])\n"
+)
+
+
+def _stub_cfg(tmp_path, **kw):
+    (tmp_path / "fake_hermes.py").write_text(STUB, encoding="utf-8")
+    base = dict(approved_roots=[str(tmp_path)], agents_enabled=True,
+                hermes_bin=sys.executable, worker_argv=[str(tmp_path / "fake_hermes.py")])
+    base.update(kw)
+    return BridgeConfig(**base)
+
+
+def test_agents_spawn_status_finish_cycle(tmp_path):
+    from hermes_chatbridge import agents as _agents
+    cfg = _stub_cfg(tmp_path)
+    out = _agents.spawn("summarize hello.txt", cfg, tmp_path)
+    assert out["state"] == "running", out
+    wid = out["worker_id"]
+    deadline = time.time() + 30
+    while True:
+        st = _agents.status(wid)
+        if st["workers"][0]["state"] == "done" or time.time() > deadline:
+            break
+        time.sleep(0.2)
+    assert st["workers"][0]["state"] == "done", st
+    assert "REPORT:summarize hello.txt" in st["workers"][0]["report_tail"], st
+    assert "agents" in cfg.tool_names()
+    done = _agents.finish(wid)
+    assert done["state"] == "done" and "REPORT:" in done["report"], done
+    assert _agents.status(wid) == {"workers": []} or "unknown" in str(_agents.status(wid))
+
+
+def test_agents_cap_and_revive(tmp_path):
+    from hermes_chatbridge import agents as _agents
+    cfg = _stub_cfg(tmp_path, agents_max_workers=1)
+    first = _agents.spawn("SLEEP long job", cfg, tmp_path)
+    assert first["state"] == "running", first
+    try:
+        assert "cap" in _agents.spawn("another", cfg, tmp_path)["error"]
+        msg = _agents.message(first["worker_id"], "hurry", cfg, tmp_path)
+        assert msg["state"] == "running" and "cannot be injected" in msg["note"], msg
+    finally:
+        done = _agents.finish(first["worker_id"], kill=True)
+        assert done["state"] == "done", done
+    cfg2 = _stub_cfg(tmp_path)
+    w = _agents.spawn("quick one", cfg2, tmp_path)
+    deadline = time.time() + 30
+    while _agents.status(w["worker_id"])["workers"][0]["state"] != "done":
+        assert time.time() < deadline
+        time.sleep(0.2)
+    revived = _agents.message(w["worker_id"], "and chapters", cfg2, tmp_path, yield_ms=25000)
+    assert revived["worker_id"] == w["worker_id"] and revived["state"] == "done", revived
+    assert "REPORT:" in revived["report_tail"], revived
+    _agents.finish(w["worker_id"])
 
 
 def test_patch_edit_is_atomic_and_confined(tmp_path):

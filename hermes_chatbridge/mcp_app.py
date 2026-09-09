@@ -134,6 +134,32 @@ def build_server(cfg: BridgeConfig | None = None, home: Path | None = None) -> M
             finally:
                 record_event(home, {"tool": "write_stdin", "session": session_id[:16]})
 
+    if cfg.agents_enabled:
+        @server.tool(description="Spawn and manage worker subagents (background hermes -z runs).")
+        def agents(
+            action: Annotated[str, Field(description="spawn | message | status | finish")] = "status",
+            worker_id: Annotated[str, Field(description="Worker id (message/status/finish)")] = "",
+            text: Annotated[str, Field(description="Task (spawn) or follow-up (message)")] = "",
+            kill: Annotated[bool, Field(description="finish: stop a running worker first")] = False,
+        ) -> dict[str, Any]:
+            from . import agents as _agents
+
+            live = BridgeConfig.load()
+            entry = {"tool": "agents", "action": action[:20], "worker": worker_id[:16]}
+            try:
+                if not live.agents_enabled:
+                    return {"error": "TOOL_DISABLED"}
+                a = (action or "status").strip().lower()
+                if a == "spawn":
+                    return _agents.spawn(text, live, home)
+                if a == "message":
+                    return _agents.message(worker_id, text, live, home)
+                if a == "finish":
+                    return _agents.finish(worker_id, kill=kill)
+                return _agents.status(worker_id)
+            finally:
+                record_event(home, entry)
+
     return server
 
 

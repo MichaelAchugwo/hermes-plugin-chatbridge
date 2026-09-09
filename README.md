@@ -71,6 +71,37 @@ and regression-tested):
   for daily use prefer a named tunnel (stable hostname) and update
   `tunnel_host` accordingly. Treat the full connector URL as a password.
 
+## Workers (opt-in multi-agent)
+
+CoS's flagship is prime/worker chats; its workers are *browser tabs* driven by
+the extension — deliberately not ported. The Hermes-native equivalent: a
+worker is a background `hermes -z` one-shot run whose report the prime
+collects with the `agents` tool (`spawn | message | status | finish`).
+
+```yaml
+agents_enabled: true
+agents_max_workers: 2   # concurrency cap, hard max 8
+worker_provider: ""     # empty = your configured defaults
+worker_model: ""
+```
+
+Honest differences from CoS to know before enabling:
+
+- Workers spend **Hermes-side model quota** (Codex/API); the prime driving
+  them spends ChatGPT chat quota. Each run writes `--usage-file` to
+  `$HERMES_HOME/workers/<id>.usage.json` so cost is auditable.
+- Workers are one-shot runs, not persistent chats. `message` on a finished
+  worker revives it: a follow-up run seeded with (task, prior report, new
+  instruction) under the same worker id. Running workers can't take injected
+  input — `message` returns current output instead.
+- Workers never receive the connector URL and run with
+  `HERMES_CHATBRIDGE_WORKER=1`; the bridge refuses `spawn` under that marker,
+  so workers cannot spawn workers. Worker cwd is locked to the first
+  approved root.
+- Default OFF (unlike CoS's on-by-default): enabling runs agent processes as
+  your user. Live `hermes -z` verification is pending a quota reset; mechanics
+  are covered by stub-runner tests (18/18 green).
+
 ## Write tools (opt-in)
 
 Disabled unless **all three** hold in `chatbridge.yaml`: `read_only: false`, the matching
