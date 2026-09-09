@@ -63,7 +63,7 @@ def test_write_tools_absent_by_default():
 
 def test_loopback_peer_helper():
     from hermes_chatbridge.mcp_app import is_loopback_peer
-    for good in ("127.0.0.1", "::1", "::ffff:127.0.0.1", "127.0.0.2"):
+    for good in ("127.0.0.1", "::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "127.0.0.2"):
         assert is_loopback_peer(good), good
     for bad in ("10.0.0.5", "8.8.8.8", "", None, "testclient", "localhost"):
         assert not is_loopback_peer(bad), bad

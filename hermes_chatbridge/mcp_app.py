@@ -164,15 +164,28 @@ def build_server(cfg: BridgeConfig | None = None, home: Path | None = None) -> M
 
 
 def is_loopback_peer(host: object) -> bool:
-    """True iff *host* is a loopback address (v4 127/8 incl. mapped, or ::1)."""
+    """True iff *host* is a loopback address.
+
+    Pure integer math (no reliance on version-dependent ``is_loopback``
+    semantics for IPv4-mapped IPv6, which differ across 3.10/3.12):
+    127/8, ::1, and ::ffff:127/8 in either decimal or hex form.
+    """
     import ipaddress
 
     if not isinstance(host, str) or not host:
         return False
     try:
-        return ipaddress.ip_address(host.strip().lower()).is_loopback
+        ip = ipaddress.ip_address(host.strip().lower())
     except ValueError:
         return False
+    if ip.version == 4:
+        return ip.is_loopback
+    n = int(ip)
+    if n == 1:  # ::1
+        return True
+    if (n >> 32) == 0xFFFF:  # ::ffff:0/96 mapped
+        return ((n & 0xFFFFFFFF) >> 24) == 127
+    return False
 
 
 class _Guard(BaseHTTPMiddleware):
