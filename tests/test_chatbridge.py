@@ -113,7 +113,7 @@ def test_live_mcp_handshake_and_secret_path(tmp_path):
         assert "bridge-mcp-ok" in json.dumps(called.json()), called.text[:300]
         evil = httpx.post(base, headers=headers, json={
             "jsonrpc": "2.0", "id": 4, "method": "tools/call",
-            "params": {"name": "read", "arguments": {"paths": ["C:/Windows/System32/drivers/etc/hosts"]}}},
+            "params": {"name": "read", "arguments": {"paths": [str(tmp_path.parent / "evil.txt")]}}},
             timeout=10)
         assert "outside approved roots" in json.dumps(evil.json())
         # Wrong token: plain 404, no oracle.
