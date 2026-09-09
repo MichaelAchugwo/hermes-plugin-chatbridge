@@ -3,7 +3,7 @@ version: 0.5.0
 description: "Local MCP bridge letting ChatGPT web chat drive approved local files/commands via Hermes — spends ChatGPT chat quota."
 author: "Michael Achugwo + Hermes Agent"
 license: MIT
-manifest_version: 2
+manifest_version: 1
 api_version: 1
 tags: [chatgpt, mcp, local-executor, desktop]
 config_schema: {}
