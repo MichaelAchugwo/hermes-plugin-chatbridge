@@ -16,8 +16,14 @@ ChatGPT Developer mode + custom MCP apps: full write actions need Business/Enter
 
 ## Install
 
+Manual copy — `hermes plugins install <github>` deliberately refuses this plugin:
+its security scanner returns a dangerous verdict (subprocess execution is the
+plugin's purpose; 10 findings, all true positives on `exec.py`/`patch.py`).
+You are installing your own code on your own machine, so copy it yourself:
+
 ```bash
-cp -R . "$HERMES_HOME/plugins/chatbridge"  # or git-install once published
+rm -rf "$HERMES_HOME/plugins/chatbridge"
+cp -R /path/to/hermes-plugin-chatbridge "$HERMES_HOME/plugins/chatbridge"
 hermes plugins enable chatbridge
 hermes chatbridge status
 ```
