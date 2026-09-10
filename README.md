@@ -39,6 +39,82 @@ allow_patch: false
 
 Zero approved roots = the bridge answers but every `read` fails closed.
 
+## Use ChatBridge from Hermes
+
+ChatBridge is an MCP server that Hermes can consume itself. This is the
+Hermes-native path: it does **not** require ChatGPT web, a browser extension,
+or a ChatGPT/Codex desktop-app modification.
+
+1. Configure the capability boundary in `$HERMES_HOME/chatbridge.yaml`.
+   A project-scoped example:
+
+   ```yaml
+   approved_roots: C:/Users/me/projects/my-app
+   read_only: false
+   allow_patch: true
+   allow_exec: true
+   allow_save: true
+   exec_allowlist: git status; npm test; python -m pytest
+   agents_enabled: true
+   agents_max_workers: 2
+   port: 18789
+   ```
+
+   An explicitly user-authorized full-local-workspace configuration is also
+   supported, but grants the MCP client the same filesystem access as your
+   Windows user:
+
+   ```yaml
+   approved_roots: C:/
+   read_only: false
+   allow_patch: true
+   allow_exec: true
+   allow_save: true
+   exec_allowlist: cmd /c; powershell -Command; python; py; git; node; npm; uv; hermes
+   agents_enabled: true
+   agents_max_workers: 2
+   port: 18789
+   ```
+
+2. Start the loopback server (keep this process running):
+
+   ```bash
+   hermes chatbridge serve --port 18789
+   ```
+
+   Set `BRIDGE_HOME` to the active Hermes home (on this Windows install it is
+   `%LOCALAPPDATA%\\hermes`), then register the local endpoint without printing
+   its secret path:
+
+   ```bash
+   BRIDGE_HOME="${HERMES_HOME:-$LOCALAPPDATA/hermes}"
+   TOKEN="$(tr -d '\r\n' < "$BRIDGE_HOME/chatbridge.token")"
+   hermes mcp add chatbridge --url "http://127.0.0.1:18789/${TOKEN}/mcp"
+   ```
+
+   At the prompts, choose **No** for separate authentication (the secret path
+   already authenticates this loopback endpoint), then enable the desired
+   tools. Check registration with `hermes mcp list` and service state with
+   `hermes chatbridge status`.
+
+4. Start a **new Hermes session**. MCP tools are discovered at session startup
+   and are named `mcp_chatbridge_read`, `mcp_chatbridge_find`,
+   `mcp_chatbridge_view_image`, `mcp_chatbridge_apply_patch`,
+   `mcp_chatbridge_exec_command`, `mcp_chatbridge_write_stdin`,
+   `mcp_chatbridge_download_artifact`, and `mcp_chatbridge_agents` when their
+   configuration gates are enabled. An already-running Hermes chat keeps its
+   existing tool schema to preserve prompt caching.
+
+5. Use ordinary requests in the new chat, for example: “Find all Python tests
+   under C:/Users/me/projects/my-app and run the relevant test command.” The
+   agent receives the MCP tools alongside Hermes's normal tools.
+
+The local server is intentionally not a Windows service. After a reboot, start
+`hermes chatbridge serve --port 18789` again before beginning a Hermes session,
+or use your own supervised service mechanism. Never publish the local endpoint
+or its token path through a public tunnel unless you intentionally configure
+the tunnel guard in the next section.
+
 ## Optional remote MCP client (tunnel)
 
 The bridge binds 127.0.0.1 only. An approved remote MCP client can reach it through a tunnel you run:
