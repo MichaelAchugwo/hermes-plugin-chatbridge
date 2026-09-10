@@ -29,7 +29,11 @@ def command(args: argparse.Namespace) -> int:
             "tools": cfg.tool_names(),
             "protocol": "mcp-streamable-http",
             "exec_sessions": session_count(),
-            "note": "Approve a folder in chatbridge.yaml before connecting. Exec/patch default OFF.",
+            "note": (
+                "Full local-workspace mode is active."
+                if cfg.approved_roots and not cfg.read_only and cfg.allow_exec and cfg.allow_patch
+                else "Configure approved_roots and capability gates in chatbridge.yaml before connecting."
+            ),
         }, indent=2))
         return 0
     if action == "serve":
